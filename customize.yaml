@@ -1,0 +1,98 @@
+# openWRT
+sensor.openwrt_conncount:
+  friendly_name: 连接数
+sensor.openwrt_user_online:
+  friendly_name: 在线用户数
+sensor.openwrt_tx:
+  friendly_name: 上传总量
+sensor.openwrt_tx_packets:
+  friendly_name: 上传速度
+sensor.openwrt_rx:
+  friendly_name: 下载总量
+sensor.openwrt_rx_packets:
+  friendly_name: 下载速度
+sensor.openwrt_cpu:
+  friendly_name: CPU占用
+sensor.openwrt_memory:
+  friendly_name: 内存占用
+sensor.openwrt_uptime:
+  friendly_name: OpenWrt启动时长
+sensor.openwrt_wan_ip:
+  friendly_name: IPv4地址
+sensor.openwrt_wan_uptime:
+  friendly_name: IPv4在线时长
+sensor.openwrt_wan6_ip:
+  friendly_name: IPv6地址
+sensor.openwrt_wan6_uptime:
+  friendly_name: IPv6在线时长
+sensor.openwrt_passwall_ip:
+  friendly_name: PW地址
+sensor.openwrt_passwall_country:
+  friendly_name: PW节点
+sensor.openwrt_cputemp:
+  friendly_name: CPU温度
+button.openwrt_reconnect_docker:
+  friendly_name: OpenWrt重连docker网络
+button.openwrt_reconnect_gw:
+  friendly_name: OpenWrt重连GW网络
+button.openwrt_reconnect_wan:
+  friendly_name: OpenWrt重连wan网络
+button.openwrt_restart:
+  friendly_name: OpenWrt重启
+button.openwrt_node_subscribe:
+  friendly_name: OpenWrt重新订阅fq节点
+button.openwrt_reconnect_wan6:
+  friendly_name: OpenWrt重连WAN6
+sensor.openwrt_cpu_temperature:
+  friendly_name: CPU温度
+switch.openwrt_passwall:
+  friendly_name: PW开关
+
+# OpenWRT Memory
+sensor.openwrt_memory_available:
+  friendly_name: Memory Available
+sensor.openwrt_memory_available_gb:
+  friendly_name: Memory Available
+sensor.openwrt_memory_buffered:
+  friendly_name: Memory Buffered
+sensor.openwrt_memory_buffered_gb:
+  friendly_name: Memory Buffered
+sensor.openwrt_memory_cached:
+  friendly_name: Memory Cached
+sensor.openwrt_memory_cached_gb:
+  friendly_name: Memory Cached
+sensor.openwrt_memory_free:
+  friendly_name: Memory Free
+sensor.openwrt_memory_free_gb:
+  friendly_name: Memory Free
+sensor.openwrt_memory_share:
+  friendly_name: Memory Share
+sensor.openwrt_memory_share_gb:
+  friendly_name: Memory Share
+sensor.openwrt_memory_total:
+  friendly_name: Memory Total
+sensor.openwrt_memory_total_gb:
+  friendly_name: Memory Total
+
+# device_tracker
+device_tracker.ikuai_p30pro:
+  friendly_name: P30Pro
+device_tracker.ikuai_k40s:
+  friendly_name: K40S
+device_tracker.ikuai_m6:
+  friendly_name: M6
+device_tracker.scm_w09:
+  map: gaode
+device_tracker.ikuai_notebook_lan:
+  friendly_name: 小米Pro14_Lan
+device_tracker.ikuai_notebook_wifi:
+  friendly_name: 小米Pro14_Wifi
+device_tracker.ikuai_desktop_lan:
+  friendly_name: 台式机
+device_tracker.ikuai_surfacego:
+  friendly_name: SurfaceGo
+#binary_sensor
+binary_sensor.sensor_p30pro:
+  friendly_name: P30Pro(Ping)
+binary_sensor.sensor_k40s:
+  friendly_name: K40s(Ping)
