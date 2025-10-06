@@ -16,7 +16,8 @@ from aiohttp.client_exceptions import ClientConnectorError
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
-from homeassistant.core import HomeAssistant, Config
+from homeassistant.core import HomeAssistant
+from homeassistant.core_config import Config
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
