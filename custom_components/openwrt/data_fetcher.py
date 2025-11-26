@@ -11,19 +11,17 @@ import time
 import datetime
 from urllib import parse
 
-from async_timeout import timeout
+from async_timeout import timeout                                           # type: ignore
 from aiohttp.client_exceptions import ClientConnectorError
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
-from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.helpers.aiohttp_client import async_create_clientsession # type: ignore
+from homeassistant.core import HomeAssistant                                # type: ignore
+from homeassistant.helpers.update_coordinator import UpdateFailed           # type: ignore
 
 from .const import (
     DO_URL,
     UBUS_URL,
     SWITCH_TYPES,
+    REQUEST_TIMEOUT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -161,7 +159,7 @@ class DataFetcher:
         url = host + DO_URL
         _LOGGER.debug("Requests remaining: %s", url)
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_cookies, url, header, body)
                 if resdata[0] == 403:
                     _LOGGER.debug("OPENWRT Username or Password is wrong，please reconfig!")
@@ -171,7 +169,11 @@ class DataFetcher:
                     return resdata
                 else:
                     _LOGGER.debug("login_successfully for OPENWRT")
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching openwrt_login data (timeout=%ds)", REQUEST_TIMEOUT)
+            return
         except (ClientConnectorError) as error:
+            _LOGGER.error("Error fetching openwrt_login data: %s", error)
             raise UpdateFailed(error)
         return resdata
 
@@ -190,48 +192,56 @@ class DataFetcher:
         url = self._host + UBUS_URL
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, header, postJson)
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching _check_openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
+            return
         except (ClientConnectorError) as error:
+            _LOGGER.error("Error fetching _check_openwrt_passwall data: %s", error)
             raise UpdateFailed(error)
 
-        _LOGGER.info(f"onoroff: %s" % resdata["result"][1]["value"])
-        # print(result)
         if resdata["result"][1]["value"] == "1":
             return True
         else:
             return False
 
     async def _get_openwrt_passwall(self, sysauth):
+        self._data["openwrt_passwall_ip"] = ""
+        self._data["openwrt_passwall_country"] = ""
+        self._data["querytime"] = ""
+
         header = {
             "Cookie": "sysauth_http=" + sysauth
         }
+        
         parameter = "admin/services/passwall/ip"
 
         url = self._host + DO_URL + parameter
-        _LOGGER.debug("_get_openwrt_passwall = " + url)
+
+        _LOGGER.debug("_get_openwrt_passwall Url = " + url)
+
         try:
-            async with timeout(10):
-                resdata2 = await self._hass.async_add_executor_job(self.requestget_data, url, header)
-        except (
-            ClientConnectorError
-        ) as error:
+            async with timeout(REQUEST_TIMEOUT):
+                resdata = await self._hass.async_add_executor_job(self.requestget_data, url, header)
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
+            return
+        except (ClientConnectorError) as error:
+            _LOGGER.error("Error fetching openwrt_passwall data: %s", error)
             raise UpdateFailed(error)
 
-        _LOGGER.debug("Requests remaining: %s", url)
-        # _LOGGER.debug(resdata)
-
-        if resdata2 == 401 or resdata2 == 403:
+        if resdata == 401 or resdata == 403:
             self._data = 401
             return
 
-        if resdata2 == 502:
+        if resdata == 502:
             self._data = 502
             return
 
-        if isinstance(resdata2, dict):
-            self._data["openwrt_passwall_ip"] = resdata2.get("outboard")
-            self._data["openwrt_passwall_country"] = resdata2.get("outboardip").get("country")
+        if isinstance(resdata, dict):
+            self._data["openwrt_passwall_ip"] = resdata.get("outboard")
+            self._data["openwrt_passwall_country"] = resdata.get("outboardip").get("country")
 
             querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self._data["querytime"] = querytime
@@ -273,18 +283,20 @@ class DataFetcher:
         url = self._host + "/ubus/"
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdatas = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, postData)
-        except (
-            ClientConnectorError
-        ) as error:
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching openwrt_status data (timeout=%ds)", REQUEST_TIMEOUT)
+            return
+        except (ClientConnectorError) as error:
+            _LOGGER.error("Error fetching openwrt_status data: %s", error)
             raise UpdateFailed(error)
 
         _LOGGER.debug("Requests remaining: %s", url)
-        # _LOGGER.debug(resdatas)
 
         if resdatas == 401 or resdatas == 403:
             self._data = 401
+            _LOGGER.debug("_get_openwrt_status requestpost_json2: %s", self._data)
             return
 
         self._data = {}
@@ -400,23 +412,34 @@ class DataFetcher:
 
         url = self._host + "/ubus/"
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, body)
-                # _LOGGER.error(resdata)
-        except (
-            ClientConnectorError
-        ) as error:
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching openwrt_version data (timeout=%ds)", REQUEST_TIMEOUT)
+            return
+        except (ClientConnectorError) as error:
+            _LOGGER.error("Error fetching openwrt_version data: %s", error)
             raise UpdateFailed(error)
+        
         _LOGGER.debug("Requests remaining: %s", url)
+        
         if resdata == 401 or resdata == 403:
             self._data = 401
+            _LOGGER.debug("get_openwrt_version requestpost_json2: %s", self._data)
             return
+        
         openwrtinfo = {}
-        _LOGGER.info(resdata)
-        # resdata = resdata.replace("\n", "").replace("\r", "")
-        openwrtinfo["sw_version"] = resdata[0]["result"][1]["kernel"]
-        openwrtinfo["device_name"] = resdata[0]["result"][1]["hostname"]
-        openwrtinfo["model"] = resdata[0]["result"][1]["release"]["description"]
+        try:
+            # 提取核心数据节点，减少重复嵌套访问
+            system_core_info = resdata[0]["result"][1]
+        except (IndexError, KeyError, TypeError):
+            # 索引/键不存在、类型错误时，初始化空字典避免后续报错
+            system_core_info = {}
+
+        # 赋值 OpenWRT 信息（get 方法容错，键不存在返回空字符串）
+        openwrtinfo["sw_version"] = system_core_info.get("kernel", "")
+        openwrtinfo["device_name"] = system_core_info.get("hostname", "")
+        openwrtinfo["model"] = system_core_info.get("release", {}).get("description", "").replace("'", "")
 
         return openwrtinfo
 

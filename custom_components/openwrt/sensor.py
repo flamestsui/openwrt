@@ -1,11 +1,8 @@
 """OPENWRT Entities"""
 import logging
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.helpers.update_coordinator import CoordinatorEntity  # type: ignore
+from homeassistant.core import HomeAssistant                            # type: ignore
+from homeassistant.config_entries import ConfigEntry                    # type: ignore
 
 from .const import COORDINATOR, DOMAIN, SENSOR_TYPES
 

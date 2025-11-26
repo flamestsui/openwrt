@@ -4,14 +4,13 @@ import time
 import datetime
 import json
 import requests
-from async_timeout import timeout
+from async_timeout import timeout                                   # type: ignore
 from aiohttp.client_exceptions import ClientConnectorError
 
-from homeassistant.components.switch import SwitchEntity
-from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.components.switch import SwitchEntity            # type: ignore
+from homeassistant.core import HomeAssistant                        # type: ignore
+from homeassistant.config_entries import ConfigEntry                # type: ignore
+from homeassistant.helpers.update_coordinator import UpdateFailed   # type: ignore
 
 from .data_fetcher import DataFetcher
 

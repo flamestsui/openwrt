@@ -1,11 +1,11 @@
 """The openwrt integration."""
 from __future__ import annotations
-from async_timeout import timeout
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from async_timeout import timeout                                                        # type: ignore
+from homeassistant.config_entries import ConfigEntry                                     # type: ignore
+from homeassistant.const import Platform                                                 # type: ignore
+from homeassistant.core import HomeAssistant                                             # type: ignore
+from homeassistant.core_config import Config                                             # type: ignore
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed  # type: ignore
 from .data_fetcher import DataFetcher
 from .const import (
     DOMAIN,
@@ -16,7 +16,7 @@ from .const import (
     COORDINATOR,
     UNDO_UPDATE_LISTENER,
 )
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryNotReady  # type: ignore
 
 import time
 import datetime
@@ -63,7 +63,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     #         hass.config_entries.async_forward_entry_setup(entry, component)
     #     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
 
     return True
 
@@ -137,13 +136,10 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                 self._sw_version = openwrtinfodata["sw_version"]
                 self._device_name = openwrtinfodata["device_name"]
                 self._model = openwrtinfodata["model"]
-                _LOGGER.info(f"Current Functioin is _async_update_data1, self._sw_version: %s" % self._sw_version)
-                _LOGGER.info(f"Current Functioin is _async_update_data1, self._device_name: %s" % self._device_name)
-                _LOGGER.info(f"Current Functioin is _async_update_data1, self._sw_version: %s" % self._model)
             try:
                 async with timeout(10):
                     data = await self._fetcher.get_data(sysauth)
-                    _LOGGER.info(f"Current Functioin is _async_update_data1, data: %s" % data)
+                    _LOGGER.debug(f"Current Functioin is _async_update_data, data: %s" % data)
                     if data == 401:
                         self._token_expire_time = 0
                         return
@@ -153,9 +149,6 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                     data["sw_version"] = self._sw_version
                     data["device_name"] = self._device_name
                     data["model"] = self._model
-                    _LOGGER.info(f"Current Functioin is _async_update_data2, self._sw_version: %s" % self._sw_version)
-                    _LOGGER.info(f"Current Functioin is _async_update_data2, self._device_name: %s" % self._device_name)
-                    _LOGGER.info(f"Current Functioin is _async_update_data2, self._sw_version: %s" % self._model)
                     return data
             except Exception as error:
                 raise UpdateFailed(error) from error

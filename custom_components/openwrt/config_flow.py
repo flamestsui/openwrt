@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import logging
 import uuid
-import voluptuous as vol
+import voluptuous as vol                    # type: ignore
 import requests
 
 import json
 from urllib import parse
 
-from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant import config_entries    # type: ignore
+from homeassistant.core import callback     # type: ignore
 
 from collections import OrderedDict
 from .const import DO_URL, DOMAIN, CONF_HOST, CONF_USERNAME, CONF_PASSWD, CONF_UPDATE_INTERVAL

@@ -12,12 +12,12 @@ CONF_UPDATE_INTERVAL = "update_interval_seconds"
 
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
+REQUEST_TIMEOUT = 10
 # OPENWRT URL
 DO_URL = "/cgi-bin/luci/"
 UBUS_URL = "/ubus/"
 
 # Sensor Configuration
-
 SENSOR_TYPES = {
     "openwrt_uptime": {
         "icon": "mdi:clock-time-eight",
@@ -183,7 +183,6 @@ SENSOR_TYPES = {
     },
 }
 
-
 BUTTON_TYPES = {
     "openwrt_restart": {
         "label": "OpenWrt重启",
@@ -245,6 +244,7 @@ BUTTON_TYPES = {
         }
     },
 }
+
 SWITCH_TYPES = {
     "passwall": {
         "icon": "mdi:account-lock",

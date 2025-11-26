@@ -5,16 +5,12 @@ import datetime
 import re
 import requests
 import json
-from async_timeout import timeout
+from async_timeout import timeout                                   # type: ignore
 from aiohttp.client_exceptions import ClientConnectorError
-
-from homeassistant.helpers.device_registry import DeviceEntryType
-
-from homeassistant.components.button import ButtonEntity
-from homeassistant.core import HomeAssistant
-from homeassistant.core_config import Config
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.components.button import ButtonEntity            # type: ignore
+from homeassistant.core import HomeAssistant                        # type: ignore
+from homeassistant.config_entries import ConfigEntry                # type: ignore
+from homeassistant.helpers.update_coordinator import UpdateFailed   # type: ignore
 
 from .const import (
     COORDINATOR,
