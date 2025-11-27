@@ -73,26 +73,3 @@ sensor.openwrt_memory_total:
   friendly_name: Memory Total
 sensor.openwrt_memory_total_gb:
   friendly_name: Memory Total
-
-# device_tracker
-device_tracker.ikuai_p30pro:
-  friendly_name: P30Pro
-device_tracker.ikuai_k40s:
-  friendly_name: K40S
-device_tracker.ikuai_m6:
-  friendly_name: M6
-device_tracker.scm_w09:
-  map: gaode
-device_tracker.ikuai_notebook_lan:
-  friendly_name: 小米Pro14_Lan
-device_tracker.ikuai_notebook_wifi:
-  friendly_name: 小米Pro14_Wifi
-device_tracker.ikuai_desktop_lan:
-  friendly_name: 台式机
-device_tracker.ikuai_surfacego:
-  friendly_name: SurfaceGo
-#binary_sensor
-binary_sensor.sensor_p30pro:
-  friendly_name: P30Pro(Ping)
-binary_sensor.sensor_k40s:
-  friendly_name: K40s(Ping)
