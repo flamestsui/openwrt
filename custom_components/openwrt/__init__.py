@@ -121,12 +121,12 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Update data via DataFetcher."""
-        _LOGGER.debug("token_expire_time = %s", self._token_expire_time)
+        _LOGGER.debug("token_expire_time: %s", self._token_expire_time)
 
         if self._allow_login == True:
             sysauth = await self.get_access_token()
             sysauth = str(sysauth)
-            _LOGGER.debug("sysauth = %s", sysauth)
+            _LOGGER.debug("sysauth: %s", sysauth)
 
             if self._sw_version == "1.0":
                 openwrtinfodata = await self._fetcher.get_openwrt_version(sysauth)
@@ -152,3 +152,5 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.error("Timeout fetching _async_update_data data (timeout=%ds)", REQUEST_TIMEOUT)
             except Exception as error:
                 raise UpdateFailed(error) from error
+        # 若不允许登录，返回空字典
+        return {}

@@ -35,6 +35,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     host = config_entry.data[CONF_HOST]
     username = config_entry.data[CONF_USERNAME]
     passwd = config_entry.data[CONF_PASSWD]
+    
+    # 等待协调器首次数据加载完成，避免初始化时数据为None
+    await coordinator.async_config_entry_first_refresh()
+    
     switchs = []
 
     if SWITCH_TYPES:
@@ -54,9 +58,10 @@ class IKUAISwitch(SwitchEntity):
         self.kind = kind
         self.coordinator = coordinator
         self._state = None
+        coordinator_data = self.coordinator.data or {}  # 空值时赋值为空字典
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self.coordinator.host)},
-            "name": self.coordinator.data["device_name"],
+            "name": coordinator_data.get("device_name", host),  
             "manufacturer": "OpenWrt",
             "model": self.coordinator.data["model"],
             "sw_version": self.coordinator.data["sw_version"],
@@ -263,15 +268,7 @@ class IKUAISwitch(SwitchEntity):
             "jsonrpc": "2.0",
             "id": 1,
             "method": "call",
-            "params": ["" + self._session_ + "",
-                       "uci",
-                       "set", {
-                           "config": "passwall",
-                           "section": "@global[0]",
-                           "values": {
-                               "enabled": "" + str(action_body)+""
-                           }
-                       }]
+            "params": ["" + self._session_ + "", "uci", "set", {"config": "passwall", "section": "@global[0]", "values": {"enabled": "" + str(action_body)+""}}]
         }
 
         url = self._host + UBUS_URL

@@ -94,8 +94,8 @@ class DataFetcher:
         else:
             self._token_ = b.group(2)
             self._session_ = b.group(1)
-            _LOGGER.info("token:" + self._token_)
-            _LOGGER.info("session:" + self._session_)
+            _LOGGER.info("token: %s", self._token_)
+            _LOGGER.info("session: %s", self._session_)
         return [self._session_, self._token_, self._session_]
 
     def seconds_to_dhms(self, seconds):
@@ -209,8 +209,8 @@ class DataFetcher:
             return False
 
     async def _get_openwrt_passwall(self, sysauth):
-        self._data["openwrt_passwall_ip"] = ""
-        self._data["openwrt_passwall_country"] = ""
+        self._data["openwrt_passwall_ip"] = "0.0.0.0"
+        self._data["openwrt_passwall_country"] = "未知"
         self._data["querytime"] = ""
 
         header = {
@@ -221,12 +221,12 @@ class DataFetcher:
 
         url = self._host + DO_URL + parameter
 
-        _LOGGER.debug("_get_openwrt_passwall Url = " + url)
+        _LOGGER.debug("_get_openwrt_passwall Url: %s", url)
 
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestget_data, url, header)
-                _LOGGER.debug("_get_openwrt_passwall resdata = %s", resdata)
+                _LOGGER.debug("_get_openwrt_passwall resdata: %s", resdata)
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
             return

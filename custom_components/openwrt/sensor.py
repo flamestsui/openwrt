@@ -43,12 +43,14 @@ class OPENWRTSensor(CoordinatorEntity):
     @property
     def device_info(self):
         """Return the device info."""
+        # 确保 data 不为 None，使用空字典作为默认值
+        data = self.coordinator.data or {}
         return {
             "identifiers": {(DOMAIN, self.coordinator.host)},
-            "name": self.coordinator.data["device_name"],
+            "name": data.get("device_name", "OpenWrt Device"),  # 提供默认值
             "manufacturer": "OpenWrt",
-            "model": self.coordinator.data["model"],
-            "sw_version": self.coordinator.data["sw_version"],
+            "model": data.get("model", "Unknown Model"),        # 提供默认值
+            "sw_version": data.get("sw_version", "Unknown"),    # 提供默认值
         }
 
     @property

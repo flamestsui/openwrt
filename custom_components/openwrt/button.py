@@ -52,12 +52,13 @@ class OPENWRTButton(ButtonEntity):
         self.kind = kind
         self.coordinator = coordinator
         self._state = None
+        coord_data = self.coordinator.data or {}
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self.coordinator.host)},
-            "name": self.coordinator.data["device_name"],
+            "name": coord_data.get("device_name", "OpenWrt Device"),  # 提供默认值
             "manufacturer": "OpenWrt",
-            "model": self.coordinator.data["model"],
-            "sw_version": self.coordinator.data["sw_version"],
+            "model": coord_data.get("model", "Unknown Model"),        # 提供默认值
+            "sw_version": coord_data.get("sw_version", "Unknown"),    # 提供默认值
         }
         self._attr_device_class = "restart"
         self._attr_entity_registry_enabled_default = True
