@@ -195,6 +195,7 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, header, postJson)
+                _LOGGER.debug("check_openwrt_passwall resdata: %s", resdata)
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching _check_openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
             return
@@ -225,6 +226,7 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestget_data, url, header)
+                _LOGGER.debug("_get_openwrt_passwall resdata = %s", resdata)
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
             return
@@ -248,18 +250,6 @@ class DataFetcher:
             self._data["querytime"] = querytime
 
         return
-
-    async def _set_openwrt_passwall(self, sysauth, actions):
-        if actions == "open":
-            postJson = {"jsonrpc": "2.0",
-                        "id": 1,
-                        "method": "call",
-                        "params": ["" + self._session_ + "", "uci", "set", {"config": "passwall", "section": "@global[0]", "values": {"enabled": "1"}}]}
-        elif actions == "close":
-            pass
-        else:
-            # actions == "check"
-            pass
 
     async def _get_openwrt_status(self, sysauth):
         postData = '[{"jsonrpc": "2.0", "id": 1, "method": "call", "params": ["' + sysauth + '", "system", "info", {}]},' + \

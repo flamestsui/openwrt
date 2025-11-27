@@ -1,10 +1,10 @@
 """The openwrt integration."""
 from __future__ import annotations
-from async_timeout import timeout                                                        # type: ignore
-from homeassistant.config_entries import ConfigEntry                                     # type: ignore
-from homeassistant.const import Platform                                                 # type: ignore
-from homeassistant.core import HomeAssistant                                             # type: ignore
-from homeassistant.core_config import Config                                             # type: ignore
+from async_timeout import timeout                                                         # type: ignore
+from homeassistant.config_entries import ConfigEntry                                      # type: ignore
+from homeassistant.const import Platform                                                  # type: ignore
+from homeassistant.core import HomeAssistant                                              # type: ignore
+from homeassistant.core_config import Config                                              # type: ignore
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed  # type: ignore
 from .data_fetcher import DataFetcher
 from .const import (
@@ -15,6 +15,7 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     COORDINATOR,
     UNDO_UPDATE_LISTENER,
+    REQUEST_TIMEOUT,
 )
 from homeassistant.exceptions import ConfigEntryNotReady  # type: ignore
 
@@ -58,10 +59,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         UNDO_UPDATE_LISTENER: undo_listener,
     }
 
-    # for component in PLATFORMS:
-    #     hass.async_create_task(
-    #         hass.config_entries.async_forward_entry_setup(entry, component)
-    #     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -136,13 +133,14 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                 self._sw_version = openwrtinfodata["sw_version"]
                 self._device_name = openwrtinfodata["device_name"]
                 self._model = openwrtinfodata["model"]
+                _LOGGER.debug("OpenWrt Version Info: %s", openwrtinfodata)
             try:
-                async with timeout(10):
+                async with timeout(REQUEST_TIMEOUT):
                     data = await self._fetcher.get_data(sysauth)
-                    _LOGGER.debug("Current Functioin is _async_update_data, data: %s", data)
+                    _LOGGER.debug("Current Function is _async_update_data, data: %s", data)
                     if data == 401:
                         self._token_expire_time = 0
-                        return
+                        return {}  # 改为返回空字典而非直接return
                     if not data:
                         _LOGGER.error("failed in getting data")
                         raise UpdateFailed("failed in getting data")
@@ -150,5 +148,7 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                     data["device_name"] = self._device_name
                     data["model"] = self._model
                     return data
+            except asyncio.TimeoutError:
+                _LOGGER.error("Timeout fetching _async_update_data data (timeout=%ds)", REQUEST_TIMEOUT)
             except Exception as error:
                 raise UpdateFailed(error) from error

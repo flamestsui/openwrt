@@ -109,11 +109,15 @@ class OPENWRTButton(ButtonEntity):
     @property
     def state_attributes(self):
         attrs = {}
-        data = self.coordinator.data
-        if self.coordinator.data.get(self.kind + "_attrs"):
-            attrs = self.coordinator.data[self.kind + "_attrs"]
-        if data:
-            attrs["querytime"] = data["querytime"]
+        data = self.coordinator.data  # 先获取数据引用
+        # 检查数据是否为None，避免空指针错误
+        if data is not None:
+            # 安全获取属性数据
+            if data.get(self.kind + "_attrs"):
+                attrs = data[self.kind + "_attrs"]
+            # 安全获取querytime（即使不存在也不会报错）
+            if "querytime" in data:
+                attrs["querytime"] = data["querytime"]
         return attrs
 
     def press(self) -> None:

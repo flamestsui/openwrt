@@ -173,13 +173,11 @@ SENSOR_TYPES = {
         "icon": "mdi:ip-network-outline",
         "label": "PassWall IP",
         "name": "passwall_ip",
-        # http://dsm.iyan.vip:8881/cgi-bin/luci/admin/services/passwall/ip
     },
     "openwrt_passwall_country": {
         "icon": "mdi:lan-connect",
         "label": "PassWall节点",
         "name": "passwall_country",
-        # http://dsm.iyan.vip:8881/cgi-bin/luci/admin/services/passwall/ip
     },
 }
 
