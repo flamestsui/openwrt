@@ -124,12 +124,12 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Update data via DataFetcher."""
-        _LOGGER.debug("token_expire_time=%s", self._token_expire_time)
+        _LOGGER.debug("token_expire_time = %s", self._token_expire_time)
 
         if self._allow_login == True:
             sysauth = await self.get_access_token()
             sysauth = str(sysauth)
-            _LOGGER.debug("sysauth - " + sysauth)
+            _LOGGER.debug("sysauth = %s", sysauth)
 
             if self._sw_version == "1.0":
                 openwrtinfodata = await self._fetcher.get_openwrt_version(sysauth)
@@ -139,7 +139,7 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
             try:
                 async with timeout(10):
                     data = await self._fetcher.get_data(sysauth)
-                    _LOGGER.debug(f"Current Functioin is _async_update_data, data: %s" % data)
+                    _LOGGER.debug("Current Functioin is _async_update_data, data: %s", data)
                     if data == 401:
                         self._token_expire_time = 0
                         return

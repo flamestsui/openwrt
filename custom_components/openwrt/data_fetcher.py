@@ -161,6 +161,7 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_cookies, url, header, body)
+                _LOGGER.debug("login_openwrt resdata: %s", resdata)
                 if resdata[0] == 403:
                     _LOGGER.debug("OPENWRT Username or Password is wrong，please reconfig!")
                     return resdata
@@ -171,7 +172,7 @@ class DataFetcher:
                     _LOGGER.debug("login_successfully for OPENWRT")
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_login data (timeout=%ds)", REQUEST_TIMEOUT)
-            return
+            resdata = [403, "", ""]
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching openwrt_login data: %s", error)
             raise UpdateFailed(error)
