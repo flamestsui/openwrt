@@ -203,21 +203,23 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, header, postJson)
-                _LOGGER.debug("check_openwrt_passwall resdata: %s", resdata)
+                _LOGGER.debug("_check_openwrt_passwall resdata: %s", resdata)
                 
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching _check_openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
-            return "unavailable"
+            # return "unavailable"
+            return False
         
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching _check_openwrt_passwall data: %s", error)
             raise UpdateFailed(error)
-            return "unavailable"
+            # return "unavailable"
+            return False
 
         if resdata["result"][1]["value"] == "1":
-            return "on"
+            return True
         else:
-            return "off"
+            return False
 
     async def _get_openwrt_passwall(self, sysauth):
         self._data["openwrt_passwall_ip"] = "0.0.0.0"
@@ -451,12 +453,11 @@ class DataFetcher:
 
     async def _get_ikuai_switch(self, sysauth, name):
         resdata = await self._check_openwrt_passwall(sysauth)
-        self._data["switch"].append({"name": name, "onoff": "unavailable"})
-        # if resdata == "on":
-        #     self._data["switch"].append({"name": name, "onoff": "on"})
-        # else:
-        #     self._data["switch"].append({"name": name, "onoff": "off"})
-        # return
+        if resdata:
+            self._data["switch"].append({"name": name, "onoff": "on"})
+        else:
+            self._data["switch"].append({"name": name, "onoff": "off"})
+        return
 
     async def get_data(self, sysauth):
         try:
