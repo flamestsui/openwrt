@@ -11,11 +11,11 @@ import time
 import datetime
 from urllib import parse
 
-from async_timeout import timeout                                           # type: ignore
+from async_timeout import timeout
 from aiohttp.client_exceptions import ClientConnectorError
-from homeassistant.helpers.aiohttp_client import async_create_clientsession # type: ignore
-from homeassistant.core import HomeAssistant                                # type: ignore
-from homeassistant.helpers.update_coordinator import UpdateFailed           # type: ignore
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
     DO_URL,
@@ -37,11 +37,12 @@ class DataFetcher:
         self._hass = hass
         self._session_client = async_create_clientsession(hass)
         self._data = {}
+        self._last_successful_data = {}
         self._token_ = ""
         self._session_ = ""
 
     def requestget_data(self, url, headerstr):
-        responsedata = requests.get(url, headers=headerstr)  # pylint: disable=missing-timeout
+        responsedata = requests.get(url, headers=headerstr)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -49,7 +50,7 @@ class DataFetcher:
         return resdata
 
     def requestpost_data(self, url, headerstr, datastr):
-        responsedata = requests.post(url, headers=headerstr, data=datastr, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, data=datastr, verify=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -57,14 +58,14 @@ class DataFetcher:
         return resdata
 
     def requestget_data_text(self, url, headerstr, datastr):
-        responsedata = requests.post(url, headers=headerstr, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, verify=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         resdata = responsedata.content.decode('utf-8')
         return resdata
 
     def requestpost_json(self, url, headerstr, json_body):
-        responsedata = requests.post(url, headers=headerstr, json=json_body, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, json=json_body, verify=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -72,7 +73,7 @@ class DataFetcher:
         return resdata
 
     def requestpost_json2(self, url, headerstr, json_body):
-        responsedata = requests.post(url, headers=headerstr, data=json_body, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, data=json_body, verify=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -80,7 +81,7 @@ class DataFetcher:
         return resdata
 
     def requestpost_cookies(self, url, headerstr, body):
-        responsedata = requests.get(url, headers=headerstr, data=body, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.get(url, headers=headerstr, data=body, verify=False)
         if responsedata.status_code == 403:
             return 403
         if responsedata.status_code != 200 and responsedata.status_code != 302:
@@ -89,6 +90,7 @@ class DataFetcher:
         result = responsedata.text
         res = re.compile(r'"sessionid": "(.*?)", "token": "(.*?)"')
         b = re.search(res, result)
+        
         if b is None:
             return 9999
         else:
@@ -116,7 +118,7 @@ class DataFetcher:
     def hum_convert(self, value):
         units = ["B", "KB", "MB", "GB", "TB", "PB"]
         size = 1024.0
-        for i in range(len(units)):  # pylint: disable=consider-using-enumerate
+        for i in range(len(units)):
             if (value / size) < 1:
                 return "%.2f%s" % (value, units[i])
             value = value / size
@@ -133,7 +135,7 @@ class DataFetcher:
         value = value/8
         units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s", "PB/s"]
         size = 1024.0
-        for i in range(len(units)):  # pylint: disable=consider-using-enumerate
+        for i in range(len(units)):
             if (value / size) < 1:
                 return "%.2f%s" % (value, units[i])
             value = value / size
@@ -158,24 +160,30 @@ class DataFetcher:
         body = "luci_username=" + username + "&luci_password=" + passwd
         url = host + DO_URL
         _LOGGER.debug("Requests remaining: %s", url)
+        
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_cookies, url, header, body)
                 _LOGGER.debug("login_openwrt resdata: %s", resdata)
-                if resdata[0] == 403:
+                
+                if isinstance(resdata, int) and resdata == 403:
                     _LOGGER.debug("OPENWRT Username or Password is wrong，please reconfig!")
-                    return resdata
-                elif resdata[0] == 9999:
+                    return []
+                
+                elif isinstance(resdata, int) and resdata == 9999:
                     _LOGGER.debug("OPENWRT Step 2 is wrong!")
-                    return resdata
+                    return [9999, "", ""]
                 else:
                     _LOGGER.debug("login_successfully for OPENWRT")
+                    
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_login data (timeout=%ds)", REQUEST_TIMEOUT)
             resdata = [403, "", ""]
+            
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching openwrt_login data: %s", error)
             raise UpdateFailed(error)
+        
         return resdata
 
     async def _check_openwrt_passwall(self, sysauth):
@@ -196,17 +204,20 @@ class DataFetcher:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, header, postJson)
                 _LOGGER.debug("check_openwrt_passwall resdata: %s", resdata)
+                
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching _check_openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
-            return
+            return "unavailable"
+        
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching _check_openwrt_passwall data: %s", error)
             raise UpdateFailed(error)
+            return "unavailable"
 
         if resdata["result"][1]["value"] == "1":
-            return True
+            return "on"
         else:
-            return False
+            return "off"
 
     async def _get_openwrt_passwall(self, sysauth):
         self._data["openwrt_passwall_ip"] = "0.0.0.0"
@@ -227,9 +238,11 @@ class DataFetcher:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestget_data, url, header)
                 _LOGGER.debug("_get_openwrt_passwall resdata: %s", resdata)
+                
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
             return
+        
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching openwrt_passwall data: %s", error)
             raise UpdateFailed(error)
@@ -276,9 +289,11 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdatas = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, postData)
+                
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_status data (timeout=%ds)", REQUEST_TIMEOUT)
             return
+        
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching openwrt_status data: %s", error)
             raise UpdateFailed(error)
@@ -343,7 +358,7 @@ class DataFetcher:
                     self._data["openwrt_wan_ip_attrs"] = resdata["result"][1]["wan"]
                     try:
                         self._data["openwrt_wan_uptime"] = self.seconds_to_dhms(resdata["result"][1]["wan"]["uptime"])
-                    except Exception:  # pylint: disable=broad-exception-caught
+                    except Exception:
                         self._data["openwrt_wan_uptime"] = resdata["result"][1]["wan"]["uptime"]
                 else:
                     self._data["openwrt_wan_ip"] = ""
@@ -354,7 +369,7 @@ class DataFetcher:
                     self._data["openwrt_wan6_ip_attrs"] = resdata["result"][1]["wan6"]
                     try:
                         self._data["openwrt_wan6_uptime"] = self.seconds_to_dhms(resdata["result"][1]["wan6"]["uptime"])
-                    except Exception:  # pylint: disable=broad-exception-caught
+                    except Exception:
                         self._data["openwrt_wan6_uptime"] = resdata["result"][1]["wan6"]["uptime"]
 
                 else:
@@ -375,8 +390,6 @@ class DataFetcher:
                 # _LOGGER.debug("Id 9 - Start")
                 self._data["openwrt_rx"] = self.hum_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["rx_bytes"])
                 self._data["openwrt_tx"] = self.hum_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["tx_bytes"])
-                # self._data["openwrt_rx_packets"] = self.speed_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["rx_packets"])
-                # self._data["openwrt_tx_packets"] = self.speed_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["tx_packets"])
                 # _LOGGER.debug("Id 9 - End")
 
             elif resdata["id"] == 10:
@@ -387,10 +400,10 @@ class DataFetcher:
                 # _LOGGER.debug("Id 10 - End")
 
         querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._data["openwrt_isold"] = False
         self._data["querytime"] = querytime
 
         # _LOGGER.debug(querytime)
-
         return
 
     async def get_openwrt_version(self, sysauth):
@@ -405,9 +418,11 @@ class DataFetcher:
         try:
             async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, body)
+                
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_version data (timeout=%ds)", REQUEST_TIMEOUT)
             return
+        
         except (ClientConnectorError) as error:
             _LOGGER.error("Error fetching openwrt_version data: %s", error)
             raise UpdateFailed(error)
@@ -436,29 +451,52 @@ class DataFetcher:
 
     async def _get_ikuai_switch(self, sysauth, name):
         resdata = await self._check_openwrt_passwall(sysauth)
-
-        if resdata == True:
-            self._data["switch"].append({"name": name, "onoff": "on"})
-        else:
-            self._data["switch"].append({"name": name, "onoff": "off"})
-        return
+        self._data["switch"].append({"name": name, "onoff": "unavailable"})
+        # if resdata == "on":
+        #     self._data["switch"].append({"name": name, "onoff": "on"})
+        # else:
+        #     self._data["switch"].append({"name": name, "onoff": "off"})
+        # return
 
     async def get_data(self, sysauth):
-        tasks = [
-            asyncio.create_task(self._get_openwrt_status(sysauth)),
-            asyncio.create_task(self._get_openwrt_passwall(sysauth)),
-        ]
-        await asyncio.gather(*tasks)
+        try:
+            async with timeout(REQUEST_TIMEOUT):
+                tasks = [
+                    asyncio.create_task(self._get_openwrt_status(sysauth)),
+                    asyncio.create_task(self._get_openwrt_passwall(sysauth)),
+                ]
+                await asyncio.gather(*tasks)
 
-        self._data["switch"] = []
-        tasks = []
-        for switch in SWITCH_TYPES:  # pylint: disable=consider-using-dict-items
-            tasks = [
-                asyncio.create_task(self._get_ikuai_switch(sysauth, SWITCH_TYPES[switch]["name"],)),
-            ]
-            await asyncio.gather(*tasks)
+                self._data["switch"] = []
+                tasks = []
+                for switch in SWITCH_TYPES:
+                    tasks = [
+                        asyncio.create_task(self._get_ikuai_switch(sysauth, SWITCH_TYPES[switch]["name"],)),
+                    ]
+                    await asyncio.gather(*tasks)
 
-        return self._data
+                self._last_successful_data = self._data.copy()
+                return self._data
+
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching openwrt data (timeout=%ds), returning last successful data", REQUEST_TIMEOUT)
+            
+            if self._last_successful_data:
+                self._data = self._last_successful_data.copy()
+                self._data["openwrt_isold"] = True
+                return self._data
+            
+            raise UpdateFailed("Timeout fetching data and no cached data available")
+        
+        except requests.exceptions.RequestException as error:
+            _LOGGER.error("Request error fetching openwrt data: %s, returning last successful data", error)
+            
+            if self._last_successful_data:
+                self._data = self._last_successful_data.copy()
+                self._data["openwrt_isold"] = True
+                return self._data
+            
+            raise UpdateFailed(f"Request error fetching data: {error}")
 
 
 class GetDataError(Exception):

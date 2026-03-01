@@ -5,12 +5,13 @@ import datetime
 import re
 import requests
 import json
-from async_timeout import timeout                                   # type: ignore
+import asyncio
+from async_timeout import timeout
 from aiohttp.client_exceptions import ClientConnectorError
-from homeassistant.components.button import ButtonEntity            # type: ignore
-from homeassistant.core import HomeAssistant                        # type: ignore
-from homeassistant.config_entries import ConfigEntry                # type: ignore
-from homeassistant.helpers.update_coordinator import UpdateFailed   # type: ignore
+from homeassistant.components.button import ButtonEntity
+from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
     COORDINATOR,
@@ -20,6 +21,7 @@ from .const import (
     CONF_USERNAME,
     CONF_PASSWD,
     DO_URL,
+    REQUEST_TIMEOUT,
 )
 
 from .data_fetcher import DataFetcher
@@ -77,8 +79,10 @@ class OPENWRTButton(ButtonEntity):
             if self._allow_login == True:
                 self._token = await self._fetcher.login_openwrt()
                 self._token = self._token[0]
-                if self._token == 403:
+                
+                if self._token == 403 or self._token == 9999:
                     self._allow_login = False
+                    
                 self._token_expire_time = time.time() + 60*60*2
                 return self._token
 
@@ -137,21 +141,21 @@ class OPENWRTButton(ButtonEntity):
         # await self.coordinator.async_request_refresh()
 
     def requestpost_data(self, url, headerstr, datastr):
-        responsedata = requests.post(url, headers=headerstr, data=datastr, verify=False, allow_redirects=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, data=datastr, verify=False, allow_redirects=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         _LOGGER.debug(responsedata)
         return responsedata
 
     def requestget_data_text(self, url, headerstr):
-        responsedata = requests.get(url, headers=headerstr)  # pylint: disable=missing-timeout
+        responsedata = requests.get(url, headers=headerstr)
         if responsedata.status_code != 200:
             return responsedata.status_code
         resdata = responsedata.content.decode('utf-8')
         return resdata
 
     def requestpost_json2(self, url, headerstr, json_body):
-        responsedata = requests.post(url, headers=headerstr, data=json_body, verify=False)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, headers=headerstr, data=json_body, verify=False)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -172,14 +176,17 @@ class OPENWRTButton(ButtonEntity):
 
                 url = self._host + "/ubus/"
                 try:
-                    async with timeout(10):
+                    async with timeout(REQUEST_TIMEOUT):
                         resdata = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, body)
-                        # _LOGGER.error(resdata)
-                except (
-                    ClientConnectorError
-                ) as error:
+
+                except (ClientConnectorError) as error:
                     raise UpdateFailed(error)
+                
+                except asyncio.TimeoutError:
+                    _LOGGER.error("Timeout fetching _openwrt_action data (timeout=%ds)", REQUEST_TIMEOUT)
+                    
                 _LOGGER.debug("Requests remaining: %s", url)
+                
                 if resdata == 401 or resdata == 403:
                     self._data = 401
                     return
@@ -212,12 +219,15 @@ class OPENWRTButton(ButtonEntity):
 
             url = self._host + DO_URL + parameter1
             try:
-                async with timeout(10):
+                async with timeout(REQUEST_TIMEOUT):
                     resdata = await self._hass.async_add_executor_job(self.requestget_data_text, url, header)
-            except (
-                ClientConnectorError
-            ) as error:
+                    
+            except (ClientConnectorError) as error:
                 raise UpdateFailed(error)
+            
+            except asyncio.TimeoutError:
+                _LOGGER.error("Timeout fetching _openwrt_action data (timeout=%ds)", REQUEST_TIMEOUT)
+                
             _LOGGER.debug("Requests remaining: %s", url)
             # _LOGGER.debug(resdata)
             if resdata == 401 or resdata == 403:
@@ -253,13 +263,17 @@ class OPENWRTButton(ButtonEntity):
             url = self._host + DO_URL + parameter2
             _LOGGER.debug(url)
             _LOGGER.debug(body)
+            
             try:
-                async with timeout(10):
+                async with timeout(REQUEST_TIMEOUT):
                     resdata = await self._hass.async_add_executor_job(self.requestpost_data, url, header, body)
-            except (
-                ClientConnectorError
-            ) as error:
+                    
+            except (ClientConnectorError) as error:
                 raise UpdateFailed(error)
+            
+            except asyncio.TimeoutError:
+                _LOGGER.error("Timeout fetching _openwrt_action data (timeout=%ds)", REQUEST_TIMEOUT)
+                
             _LOGGER.debug("Requests remaining: %s", url)
             _LOGGER.debug(resdata)
             if resdata == 401 or resdata == 403:

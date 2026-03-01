@@ -4,13 +4,14 @@ import time
 import datetime
 import json
 import requests
-from async_timeout import timeout                                   # type: ignore
+from async_timeout import timeout
 from aiohttp.client_exceptions import ClientConnectorError
+import asyncio
 
-from homeassistant.components.switch import SwitchEntity            # type: ignore
-from homeassistant.core import HomeAssistant                        # type: ignore
-from homeassistant.config_entries import ConfigEntry                # type: ignore
-from homeassistant.helpers.update_coordinator import UpdateFailed   # type: ignore
+from homeassistant.components.switch import SwitchEntity
+from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .data_fetcher import DataFetcher
 
@@ -23,6 +24,7 @@ from .const import (
     DO_URL,
     SWITCH_TYPES,
     UBUS_URL,
+    REQUEST_TIMEOUT,
 )
 
 
@@ -43,7 +45,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
     if SWITCH_TYPES:
         _LOGGER.debug("setup switchs")
-        for switch in SWITCH_TYPES:  # pylint: disable=consider-using-dict-items
+        for switch in SWITCH_TYPES:
             switchs.append(IKUAISwitch(hass, switch, coordinator, host, username, passwd))
             _LOGGER.debug(SWITCH_TYPES[switch]["name"])
         async_add_entities(switchs, False)
@@ -59,6 +61,7 @@ class IKUAISwitch(SwitchEntity):
         self.coordinator = coordinator
         self._state = None
         coordinator_data = self.coordinator.data or {}  # 空值时赋值为空字典
+        # _LOGGER.debug("coordinator_data %s", coordinator_data)
         self._attr_device_info = {
             "identifiers": {(DOMAIN, self.coordinator.host)},
             "name": coordinator_data.get("device_name", host),  
@@ -80,6 +83,8 @@ class IKUAISwitch(SwitchEntity):
         self._turn_off_body = SWITCH_TYPES[self.kind]['turn_off_body']
         self._change = True
         self._switchonoff = None
+        
+        self._isold = coordinator_data.get("openwrt_isold", False)
 
         self._token_ = ""
         self._session_ = ""
@@ -153,7 +158,7 @@ class IKUAISwitch(SwitchEntity):
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
             "Cookie": "sysauth_http=" + self._sysauth_
         }
-        responsedata = requests.post(url,  headers=header, json=json_body)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url,  headers=header, json=json_body)
         if responsedata.status_code != 200:
             return responsedata.status_code
         json_text = responsedata.content.decode('utf-8')
@@ -167,7 +172,7 @@ class IKUAISwitch(SwitchEntity):
             "Cookie": "sysauth_http=" + self._sysauth_,
             "Content-Length": str(len(data_body))
         }
-        responsedata = requests.post(url, data=data_body, headers=header)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, data=data_body, headers=header)
         if responsedata.status_code == 403:
             _LOGGER.error(f"Current function requestpost_token, error code %s" % str(responsedata.status_code))
             _LOGGER.error(f"Current function requestpost_token, url: %s" % url)
@@ -192,7 +197,7 @@ class IKUAISwitch(SwitchEntity):
             "Cookie": "sysauth_http=" + self._sysauth_,
             "Content-Length": str(len(data_body))
         }
-        responsedata = requests.post(url, data=data_body, headers=header)  # pylint: disable=missing-timeout
+        responsedata = requests.post(url, data=data_body, headers=header)
         if responsedata.status_code == 403:
             _LOGGER.error(url)
             _LOGGER.error(data_body)
@@ -211,15 +216,22 @@ class IKUAISwitch(SwitchEntity):
         else:
             if self._allow_login == True:
                 self._token = await self._fetcher.login_openwrt()
+                
                 self._sysauth_ = self._token[0]
                 self._token_ = self._token[1]
                 self._session_ = self._token[2]
+                
+                if self._sysauth_ == 403 or self._sysauth_ == 9999:
+                    self._allow_login = False
+                
                 if self._token == 10001:
                     self._allow_login = False
+                    
                 self._token_expire_time = time.time() + 60*60*2
                 return self._token
             else:
                 return
+            
             return False
 
     async def passwall_check(self):
@@ -229,16 +241,32 @@ class IKUAISwitch(SwitchEntity):
             "method": "call",
             "params": ["" + self._session_ + "", "uci", "get", {"config": "passwall", "section": "@global[0]", "option": "enabled"}]
         }
-
+        
         url = self._host + UBUS_URL
-        _LOGGER.info(f"Current funtion passwall_check , _session_ : %s" % self._session_)
-        _LOGGER.info(f"Current funtion passwall_check , _token_ : %s" % self._token_)
+        _LOGGER.debug(f"Current funtion passwall_check , _session_ : %s" % self._session_)
+        _LOGGER.debug(f"Current funtion passwall_check , _token_ : %s" % self._token_)
+        
+        # _LOGGER.debug(f"Current funtion SWITCH_TYPES[isold] : %s" % SWITCH_TYPES["isold"])
+        # _LOGGER.debug(f"Current funtion SWITCH_TYPES[openwrt_isold] : %s" % self.coordinator.data["openwrt_isold"])
+        # _LOGGER.debug(f"Current funtion self.coordinator.data : %s" % self.coordinator.data)
+        
+        if self.coordinator.data["openwrt_isold"]:
+            raise UpdateFailed("无法连接到服务器！！！")
+        
+        if not self._allow_login:
+            _LOGGER.error("Current function passwall_check, _allow_login is False")
+            return False
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, postJson)
+                
         except (ClientConnectorError) as error:
             raise UpdateFailed(error)
+        
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching passwall_check data (timeout=%ds)", REQUEST_TIMEOUT)
+            return False
 
         if resdata["result"][1]["value"] == "1":
             return "on"
@@ -249,14 +277,23 @@ class IKUAISwitch(SwitchEntity):
         postJson = {"jsonrpc": "2.0", "id": 1, "method": "call", "params": ["" + self._session_ + "", "uci", "changes", {}]}
 
         url = self._host + UBUS_URL
-        _LOGGER.info(f"Current funtion passwall_ischange , _session_ : %s" % self._session_)
-        _LOGGER.info(f"Current funtion passwall_ischange , _token_ : %s" % self._token_)
+        _LOGGER.debug(f"Current funtion passwall_ischange , _session_ : %s" % self._session_)
+        _LOGGER.debug(f"Current funtion passwall_ischange , _token_ : %s" % self._token_)
+        
+        if not self._allow_login:
+            _LOGGER.error("Current function passwall_ischange, _allow_login is False")
+            return False
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, postJson)
+                
         except (ClientConnectorError) as error:
             raise UpdateFailed(error)
+        
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching passwall_ischange data (timeout=%ds)", REQUEST_TIMEOUT)
+            return False
 
         if resdata["result"][1]["changes"] == {}:
             return False
@@ -270,16 +307,25 @@ class IKUAISwitch(SwitchEntity):
             "method": "call",
             "params": ["" + self._session_ + "", "uci", "set", {"config": "passwall", "section": "@global[0]", "values": {"enabled": "" + str(action_body)+""}}]
         }
+        
+        if not self._allow_login:
+            _LOGGER.error("Current function passwall_action, _allow_login is False")
+            return False
 
         url = self._host + UBUS_URL
-        _LOGGER.info(f"Current funtion passwall_action , _session_ : %s" % self._session_)
-        _LOGGER.info(f"Current funtion passwall_action , _token_ : %s" % self._token_)
+        _LOGGER.debug(f"Current funtion passwall_action , _session_ : %s" % self._session_)
+        _LOGGER.debug(f"Current funtion passwall_action , _token_ : %s" % self._token_)
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json, url, postJson)
+                
         except (ClientConnectorError) as error:
             raise UpdateFailed(error)
+        
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching passwall_action data (timeout=%ds)", REQUEST_TIMEOUT)
+            return False
 
         _LOGGER.debug("Requests remaining: %s", url)
         _LOGGER.debug(resdata)
@@ -295,14 +341,23 @@ class IKUAISwitch(SwitchEntity):
         postData = "sid=" + self._session_ + "&token=" + self._token_
 
         url = self._host + "/cgi-bin/luci/admin/uci/apply_rollback"
-        _LOGGER.info(f"Current funtion passwall_submit , _session_ : %s" % self._session_)
-        _LOGGER.info(f"Current funtion passwall_submit , _token_ : %s" % self._token_)
+        _LOGGER.debug(f"Current funtion passwall_submit , _session_ : %s" % self._session_)
+        _LOGGER.debug(f"Current funtion passwall_submit , _token_ : %s" % self._token_)
+        
+        if not self._allow_login:
+            _LOGGER.error("Current function passwall_submit, _allow_login is False")
+            return False
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_token, url, postData)
+                
         except (ClientConnectorError) as error:
             raise UpdateFailed(error)
+        
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching passwall_submit data (timeout=%ds)", REQUEST_TIMEOUT)
+            return False
 
         if resdata == 403:
             return False
@@ -316,14 +371,23 @@ class IKUAISwitch(SwitchEntity):
         postData = "token=" + self._token_task_
 
         url = self._host + "/cgi-bin/luci/admin/uci/confirm"
-        _LOGGER.info(f"Current funtion passwall_confrim , _session_ : %s" % self._session_)
-        _LOGGER.info(f"Current funtion passwall_confrim , _token_ : %s" % self._token_)
+        _LOGGER.debug(f"Current funtion passwall_confrim , _session_ : %s" % self._session_)
+        _LOGGER.debug(f"Current funtion passwall_confrim , _token_ : %s" % self._token_)
+        
+        if not self._allow_login:
+            _LOGGER.error("Current function passwall_confrim, _allow_login is False")
+            return False
 
         try:
-            async with timeout(10):
+            async with timeout(REQUEST_TIMEOUT):
                 resdata = await self._hass.async_add_executor_job(self.requestpost_confirm, url, postData)
+                
         except (ClientConnectorError) as error:
             raise UpdateFailed(error)
+        
+        except asyncio.TimeoutError:
+            _LOGGER.error("Timeout fetching passwall_confrim data (timeout=%ds)", REQUEST_TIMEOUT)
+            return False
 
         if resdata == "OK":
             return True
@@ -331,15 +395,22 @@ class IKUAISwitch(SwitchEntity):
             return False
 
     async def _switch(self, action_body):
+        # if self._isold:
+        #     raise UpdateFailed("无法连接到服务器")
+        #     return
+        
         if self._allow_login == True:
             await self.get_access_token()
             resdata = await self.passwall_check()
-            _LOGGER.error(f"Currert Switch Status :%s" % resdata)
+            _LOGGER.error(f"Currert Switch Status : %s" % resdata)
+            
             retdata = await self.passwall_action(action_body)
             retdata = await self.passwall_ischange()
+            
             if retdata:
                 retdata = await self.passwall_submit()
                 retdata = await self.passwall_confrim()
 
-        _LOGGER.info("操作openwrt switch: %s ")
+            _LOGGER.info("操作openwrt switch: %s, 结果: %s" % (action_body, retdata))
+
         return "OK"

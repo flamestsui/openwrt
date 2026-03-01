@@ -1,11 +1,11 @@
 """The openwrt integration."""
 from __future__ import annotations
-from async_timeout import timeout                                                         # type: ignore
-from homeassistant.config_entries import ConfigEntry                                      # type: ignore
-from homeassistant.const import Platform                                                  # type: ignore
-from homeassistant.core import HomeAssistant                                              # type: ignore
-from homeassistant.core_config import Config                                              # type: ignore
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed  # type: ignore
+from async_timeout import timeout
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
+from homeassistant.core_config import Config
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from .data_fetcher import DataFetcher
 from .const import (
     DOMAIN,
@@ -17,7 +17,7 @@ from .const import (
     UNDO_UPDATE_LISTENER,
     REQUEST_TIMEOUT,
 )
-from homeassistant.exceptions import ConfigEntryNotReady  # type: ignore
+from homeassistant.exceptions import ConfigEntryNotReady
 
 import time
 import datetime
@@ -113,10 +113,14 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
         else:
             if self._allow_login == True:
                 self._token = await self._fetcher.login_openwrt()
+                
                 self._token = self._token[0]
-                if self._token == 403:
+                
+                if self._token == 403 or self._token == 9999:
                     self._allow_login = False
+                    
                 self._token_expire_time = time.time() + 60*60*2
+                
                 return self._token
 
     async def _async_update_data(self):
@@ -130,26 +134,35 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
 
             if self._sw_version == "1.0":
                 openwrtinfodata = await self._fetcher.get_openwrt_version(sysauth)
-                self._sw_version = openwrtinfodata["sw_version"]
-                self._device_name = openwrtinfodata["device_name"]
-                self._model = openwrtinfodata["model"]
-                _LOGGER.debug("OpenWrt Version Info: %s", openwrtinfodata)
+                if openwrtinfodata is not None:  # 只有成功获取数据时才更新
+                    self._sw_version = openwrtinfodata["sw_version"]
+                    self._device_name = openwrtinfodata["device_name"]
+                    self._model = openwrtinfodata["model"]
+                    _LOGGER.debug("OpenWrt Version Info: %s", openwrtinfodata)
+                else:
+                    _LOGGER.warning("Failed to get OpenWrt version info, keeping existing values")
+                
             try:
                 async with timeout(REQUEST_TIMEOUT):
                     data = await self._fetcher.get_data(sysauth)
                     _LOGGER.debug("Current Function is _async_update_data, data: %s", data)
+                    
                     if data == 401:
                         self._token_expire_time = 0
-                        return {}  # 改为返回空字典而非直接return
+                        return {}
+                    
                     if not data:
                         _LOGGER.error("failed in getting data")
                         raise UpdateFailed("failed in getting data")
+                    
                     data["sw_version"] = self._sw_version
                     data["device_name"] = self._device_name
                     data["model"] = self._model
                     return data
+                
             except asyncio.TimeoutError:
                 _LOGGER.error("Timeout fetching _async_update_data data (timeout=%ds)", REQUEST_TIMEOUT)
+                
             except Exception as error:
                 raise UpdateFailed(error) from error
         # 若不允许登录，返回空字典

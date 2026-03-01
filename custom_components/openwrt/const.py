@@ -179,6 +179,11 @@ SENSOR_TYPES = {
         "label": "PassWall节点",
         "name": "passwall_country",
     },
+    "openwrt_isold": {
+        "icon": "mdi:clock-time-twelve-outline",
+        "label": "是否旧数据",
+        "name": "isold",
+    },
 }
 
 BUTTON_TYPES = {
