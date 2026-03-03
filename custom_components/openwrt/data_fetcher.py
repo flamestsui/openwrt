@@ -250,11 +250,13 @@ class DataFetcher:
             raise UpdateFailed(error)
 
         if resdata == 401 or resdata == 403:
-            self._data = 401
+            self._data["openwrt_passwall_ip"] = "0.0.0.0"
+            self._data["openwrt_passwall_country"] = "未授权"
             return
 
         if resdata == 502:
-            self._data = 502
+            self._data["openwrt_passwall_ip"] = "0.0.0.0"
+            self._data["openwrt_passwall_country"] = "服务不可用"
             return
 
         if isinstance(resdata, dict):
@@ -459,7 +461,7 @@ class DataFetcher:
             self._data["switch"].append({"name": name, "onoff": "off"})
         return
 
-    async def get_data(self, sysauth):
+    async def get_data1(self, sysauth):
         try:
             async with timeout(REQUEST_TIMEOUT):
                 tasks = [
@@ -499,6 +501,16 @@ class DataFetcher:
             
             raise UpdateFailed(f"Request error fetching data: {error}")
 
+    async def get_data(self, sysauth):
+        # 顺序执行，避免并发请求路由器导致超时
+        await self._get_openwrt_status(sysauth)
+        await self._get_openwrt_passwall(sysauth)
 
+        self._data["switch"] = []
+        for switch in SWITCH_TYPES:
+            await self._get_ikuai_switch(sysauth, SWITCH_TYPES[switch]["name"])
+
+        return self._data
+    
 class GetDataError(Exception):
     """request error or response data is unexpected"""
