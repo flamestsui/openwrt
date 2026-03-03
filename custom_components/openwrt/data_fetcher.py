@@ -243,6 +243,11 @@ class DataFetcher:
                 
         except asyncio.TimeoutError:
             _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
+            self._data["openwrt_passwall_ip"] = "0.0.0.0"
+            self._data["openwrt_passwall_country"] = "连接超时"
+            
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
             return
         
         except (ClientConnectorError) as error:
@@ -252,11 +257,17 @@ class DataFetcher:
         if resdata == 401 or resdata == 403:
             self._data["openwrt_passwall_ip"] = "0.0.0.0"
             self._data["openwrt_passwall_country"] = "未授权"
+            
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
             return
 
         if resdata == 502:
             self._data["openwrt_passwall_ip"] = "0.0.0.0"
             self._data["openwrt_passwall_country"] = "服务不可用"
+            
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
             return
 
         if isinstance(resdata, dict):

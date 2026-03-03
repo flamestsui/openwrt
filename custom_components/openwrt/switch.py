@@ -66,8 +66,8 @@ class IKUAISwitch(SwitchEntity):
             "identifiers": {(DOMAIN, self.coordinator.host)},
             "name": coordinator_data.get("device_name", host),  
             "manufacturer": "OpenWrt",
-            "model": self.coordinator.data["model"],
-            "sw_version": self.coordinator.data["sw_version"],
+            "model": coordinator_data.get("model", "Unknown Model"),        # 提供默认值
+            "sw_version": coordinator_data.get("sw_version", "Unknown"),    # 提供默认值
         }
         self._attr_icon = SWITCH_TYPES[self.kind]['icon']
         self._attr_device_class = "switch"
@@ -91,7 +91,7 @@ class IKUAISwitch(SwitchEntity):
         self._sysauth_ = ""
         self._token_task_ = ""
 
-        listswitch = self.coordinator.data.get("switch")
+        listswitch = self.coordinator.data.get("switch", [])
 
         for switchdata in listswitch:
             if switchdata["name"] == self._name:
@@ -143,7 +143,7 @@ class IKUAISwitch(SwitchEntity):
         """Update entity."""
         await self.coordinator.async_request_refresh()
 
-        listswitch = self.coordinator.data.get("switch")
+        listswitch = self.coordinator.data.get("switch", [])
 
         for switchdata in listswitch:
             if switchdata["name"] == self._name:
