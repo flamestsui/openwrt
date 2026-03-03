@@ -40,6 +40,51 @@ class DataFetcher:
         self._last_successful_data = {}
         self._token_ = ""
         self._session_ = ""
+        self._default_data = {
+            "openwrt_conncount": "0",
+            "openwrt_cpu": "0",
+            "openwrt_cputemp": 0,
+            "openwrt_isold": False,
+            "openwrt_memory": 20.0,
+            "openwrt_memory_attrs": {
+                "available": 0,
+                "buffered": 0,
+                "cached": 0,
+                "free": 0,
+                "shared": 0,
+                "total": 0
+            },
+            "openwrt_memory_available": 0,
+            "openwrt_memory_available_gb": 0,
+            "openwrt_memory_buffered": 0,
+            "openwrt_memory_buffered_gb": 0,
+            "openwrt_memory_cached": 0,
+            "openwrt_memory_cached_gb": 0,
+            "openwrt_memory_free": 0,
+            "openwrt_memory_free_gb": 0,
+            "openwrt_memory_shared": 0,
+            "openwrt_memory_shared_gb": 0,
+            "openwrt_memory_total": 0,
+            "openwrt_memory_total_gb": 0,
+            "openwrt_passwall_country": "默认",
+            "openwrt_passwall_ip": "0.0.0.0",
+            "openwrt_rx": "0",
+            "openwrt_rx_packets": "0",
+            "openwrt_tx": "0",
+            "openwrt_tx_packets": "0",
+            "openwrt_uptime": "0分钟",
+            "openwrt_user_online": 0,
+            "openwrt_wan6_ip": "",
+            "openwrt_wan6_uptime": "",
+            "openwrt_wan_ip": "192.168.88.2",
+            "openwrt_wan_uptime": "0分钟",
+            "switch": [
+                {
+                    "name": "passwall",
+                    "onoff": "on"
+                }
+            ]
+        }
 
     def requestget_data(self, url, headerstr):
         responsedata = requests.get(url, headers=headerstr)
@@ -159,7 +204,7 @@ class DataFetcher:
 
         body = "luci_username=" + username + "&luci_password=" + passwd
         url = host + DO_URL
-        _LOGGER.debug("Requests remaining: %s", url)
+        # _LOGGER.debug("Requests remaining: %s", url)
         
         try:
             async with timeout(REQUEST_TIMEOUT):
@@ -177,11 +222,11 @@ class DataFetcher:
                     _LOGGER.debug("login_successfully for OPENWRT")
                     
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching openwrt_login data (timeout=%ds)", REQUEST_TIMEOUT)
+            _LOGGER.error("Timeout fetching login_openwrt data (timeout=%ds)", REQUEST_TIMEOUT)
             resdata = [403, "", ""]
             
         except (ClientConnectorError) as error:
-            _LOGGER.error("Error fetching openwrt_login data: %s", error)
+            _LOGGER.error("Error fetching login_openwrt data: %s", error)
             raise UpdateFailed(error)
         
         return resdata
@@ -222,9 +267,9 @@ class DataFetcher:
             return False
 
     async def _get_openwrt_passwall(self, sysauth):
-        self._data["openwrt_passwall_ip"] = "0.0.0.0"
-        self._data["openwrt_passwall_country"] = "未知"
-        self._data["querytime"] = ""
+        # 保存当前值，以便在超时时恢复
+        current_passwall_ip = self._data.get("openwrt_passwall_ip", "0.0.0.0")
+        current_passwall_country = self._data.get("openwrt_passwall_country", "未知")
 
         header = {
             "Cookie": "sysauth_http=" + sysauth
@@ -234,7 +279,7 @@ class DataFetcher:
 
         url = self._host + DO_URL + parameter
 
-        _LOGGER.debug("_get_openwrt_passwall Url: %s", url)
+        # _LOGGER.debug("_get_openwrt_passwall Url: %s", url)
 
         try:
             async with timeout(REQUEST_TIMEOUT):
@@ -242,17 +287,24 @@ class DataFetcher:
                 _LOGGER.debug("_get_openwrt_passwall resdata: %s", resdata)
                 
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
-            self._data["openwrt_passwall_ip"] = "0.0.0.0"
-            self._data["openwrt_passwall_country"] = "连接超时"
+            _LOGGER.error("Timeout fetching _get_openwrt_passwall data (timeout=%ds)", REQUEST_TIMEOUT)
+            # 超时时保持之前的数据不变
+            self._data["openwrt_passwall_ip"] = current_passwall_ip
+            self._data["openwrt_passwall_country"] = current_passwall_country
             
             querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self._data["querytime"] = querytime
             return
         
         except (ClientConnectorError) as error:
-            _LOGGER.error("Error fetching openwrt_passwall data: %s", error)
-            raise UpdateFailed(error)
+            _LOGGER.error("Error fetching _get_openwrt_passwall data: %s", error)
+            # 错误时保持之前的数据不变
+            self._data["openwrt_passwall_ip"] = current_passwall_ip
+            self._data["openwrt_passwall_country"] = current_passwall_country
+            
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
+            return
 
         if resdata == 401 or resdata == 403:
             self._data["openwrt_passwall_ip"] = "0.0.0.0"
@@ -280,6 +332,9 @@ class DataFetcher:
         return
 
     async def _get_openwrt_status(self, sysauth):
+        # 保存当前值，以便在超时时恢复
+        current_data = self._data.copy()
+
         postData = '[{"jsonrpc": "2.0", "id": 1, "method": "call", "params": ["' + sysauth + '", "system", "info", {}]},' + \
             '{"jsonrpc": "2.0", "id": 2, "method": "call", "params": ["' + sysauth + '", "luci", "getCPUInfo", {}]},' + \
             '{"jsonrpc": "2.0", "id": 3, "method": "call", "params": ["' + sysauth + '", "luci", "getCPUUsage", {}]},' +\
@@ -306,14 +361,28 @@ class DataFetcher:
                 resdatas = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, postData)
                 
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching openwrt_status data (timeout=%ds)", REQUEST_TIMEOUT)
+            _LOGGER.error("Timeout fetching _get_openwrt_status data (timeout=%ds)", REQUEST_TIMEOUT)
+            # 超时时保持之前的数据不变
+            self._data = current_data.copy()
+            # 更新querytime为当前时间
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
+            # 标记数据为旧数据
+            self._data["openwrt_isold"] = True
             return
         
         except (ClientConnectorError) as error:
-            _LOGGER.error("Error fetching openwrt_status data: %s", error)
-            raise UpdateFailed(error)
+            _LOGGER.error("Error fetching _get_openwrt_status data: %s", error)
+            # raise UpdateFailed(error)
+            self._data = current_data.copy()
+            # 更新querytime为当前时间
+            querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self._data["querytime"] = querytime
+            # 标记数据为旧数据
+            self._data["openwrt_isold"] = True
+            return
 
-        _LOGGER.debug("Requests remaining: %s", url)
+        # _LOGGER.debug("Requests remaining: %s", url)
 
         if resdatas == 401 or resdatas == 403:
             self._data = 401
@@ -435,14 +504,14 @@ class DataFetcher:
                 resdata = await self._hass.async_add_executor_job(self.requestpost_json2, url, header, body)
                 
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching openwrt_version data (timeout=%ds)", REQUEST_TIMEOUT)
+            _LOGGER.error("Timeout fetching get_openwrt_version data (timeout=%ds)", REQUEST_TIMEOUT)
             return
         
         except (ClientConnectorError) as error:
-            _LOGGER.error("Error fetching openwrt_version data: %s", error)
+            _LOGGER.error("Error fetching get_openwrt_version data: %s", error)
             raise UpdateFailed(error)
         
-        _LOGGER.debug("Requests remaining: %s", url)
+        # _LOGGER.debug("Requests remaining: %s", url)
         
         if resdata == 401 or resdata == 403:
             self._data = 401
@@ -472,7 +541,7 @@ class DataFetcher:
             self._data["switch"].append({"name": name, "onoff": "off"})
         return
 
-    async def get_data1(self, sysauth):
+    async def get_data(self, sysauth):
         try:
             async with timeout(REQUEST_TIMEOUT):
                 tasks = [
@@ -493,17 +562,20 @@ class DataFetcher:
                 return self._data
 
         except asyncio.TimeoutError:
-            _LOGGER.error("Timeout fetching openwrt data (timeout=%ds), returning last successful data", REQUEST_TIMEOUT)
+            _LOGGER.error("Timeout fetching get_openwrt_data (timeout=%ds), returning last successful data", REQUEST_TIMEOUT)
             
             if self._last_successful_data:
                 self._data = self._last_successful_data.copy()
                 self._data["openwrt_isold"] = True
                 return self._data
             
+            _LOGGER.error("No last successful data available, returning default data")
+            return self._default_data
+            
             raise UpdateFailed("Timeout fetching data and no cached data available")
         
         except requests.exceptions.RequestException as error:
-            _LOGGER.error("Request error fetching openwrt data: %s, returning last successful data", error)
+            _LOGGER.error("Request error fetching get_openwrt_data: %s, returning last successful data", error)
             
             if self._last_successful_data:
                 self._data = self._last_successful_data.copy()
@@ -512,16 +584,16 @@ class DataFetcher:
             
             raise UpdateFailed(f"Request error fetching data: {error}")
 
-    async def get_data(self, sysauth):
-        # 顺序执行，避免并发请求路由器导致超时
-        await self._get_openwrt_status(sysauth)
-        await self._get_openwrt_passwall(sysauth)
+    # async def get_data(self, sysauth):
+    #     # 顺序执行，避免并发请求路由器导致超时
+    #     await self._get_openwrt_status(sysauth)
+    #     await self._get_openwrt_passwall(sysauth)
 
-        self._data["switch"] = []
-        for switch in SWITCH_TYPES:
-            await self._get_ikuai_switch(sysauth, SWITCH_TYPES[switch]["name"])
+    #     self._data["switch"] = []
+    #     for switch in SWITCH_TYPES:
+    #         await self._get_ikuai_switch(sysauth, SWITCH_TYPES[switch]["name"])
 
-        return self._data
+    #     return self._data
     
 class GetDataError(Exception):
     """request error or response data is unexpected"""

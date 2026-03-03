@@ -12,7 +12,7 @@ CONF_UPDATE_INTERVAL = "update_interval_seconds"
 
 UNDO_UPDATE_LISTENER = "undo_update_listener"
 
-REQUEST_TIMEOUT = 15
+REQUEST_TIMEOUT = 10
 # OPENWRT URL
 DO_URL = "/cgi-bin/luci/"
 UBUS_URL = "/ubus/"
