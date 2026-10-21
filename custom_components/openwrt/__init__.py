@@ -113,8 +113,11 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
         else:
             if self._allow_login == True:
                 self._token = await self._fetcher.login_openwrt()
-                
-                self._token = self._token[0]
+
+                if not isinstance(self._token, list) or not self._token:
+                    self._token = 403
+                else:
+                    self._token = self._token[0]
                 
                 if self._token == 403 or self._token == 9999:
                     self._allow_login = False
@@ -164,6 +167,7 @@ class OPENWRTDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.error("Timeout fetching _async_update_data data (timeout=%ds)", REQUEST_TIMEOUT)
                 
             except Exception as error:
+                _LOGGER.exception("Unexpected error while fetching openwrt data")
                 raise UpdateFailed(error) from error
         # 若不允许登录，返回空字典
         return {}

@@ -261,10 +261,15 @@ class DataFetcher:
             # return "unavailable"
             return False
 
-        if resdata["result"][1]["value"] == "1":
+        result = resdata.get("result") if isinstance(resdata, dict) else None
+        if (
+            isinstance(result, list)
+            and len(result) > 1
+            and isinstance(result[1], dict)
+            and result[1].get("value") == "1"
+        ):
             return True
-        else:
-            return False
+        return False
 
     async def _get_openwrt_passwall(self, sysauth):
         # 保存当前值，以便在超时时恢复
@@ -324,7 +329,7 @@ class DataFetcher:
 
         if isinstance(resdata, dict):
             self._data["openwrt_passwall_ip"] = resdata.get("outboard")
-            self._data["openwrt_passwall_country"] = resdata.get("outboardip").get("country")
+            self._data["openwrt_passwall_country"] = (resdata.get("outboardip") or {}).get("country")
 
             querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             self._data["querytime"] = querytime
@@ -389,72 +394,89 @@ class DataFetcher:
             _LOGGER.debug("_get_openwrt_status requestpost_json2: %s", self._data)
             return
 
+        if not isinstance(resdatas, list):
+            _LOGGER.error("Unexpected _get_openwrt_status response: %s", resdatas)
+            self._data = current_data.copy()
+            self._data["openwrt_isold"] = True
+            return
+
         self._data = {}
 
         for resdata in resdatas:
+            result = resdata.get("result")
+            if (
+                not isinstance(result, list)
+                or len(result) < 2
+                or result[0] != 0
+                or not isinstance(result[1], dict)
+            ):
+                _LOGGER.debug("ubus call id %s returned unexpected result: %s", resdata.get("id"), result)
+                continue
+            payload = result[1]
+
             if resdata["id"] == 1:
                 # _LOGGER.debug("Id 1 - Start")
-                self._data["openwrt_uptime"] = self.seconds_to_dhms(resdata["result"][1]["uptime"])
+                self._data["openwrt_uptime"] = self.seconds_to_dhms(payload["uptime"])
 
-                self._data["openwrt_memory"] = round((1 - resdata["result"][1]["memory"]["available"]/resdata["result"][1]["memory"]["total"])*100, 0)
-                self._data["openwrt_memory_attrs"] = resdata["result"][1]["memory"]
+                self._data["openwrt_memory"] = round((1 - payload["memory"]["available"]/payload["memory"]["total"])*100, 0)
+                self._data["openwrt_memory_attrs"] = payload["memory"]
 
-                self._data["openwrt_memory_total"] = resdata["result"][1]["memory"]["total"]
-                self._data["openwrt_memory_free"] = resdata["result"][1]["memory"]["free"]
-                self._data["openwrt_memory_shared"] = resdata["result"][1]["memory"]["shared"]
-                self._data["openwrt_memory_buffered"] = resdata["result"][1]["memory"]["buffered"]
-                self._data["openwrt_memory_available"] = resdata["result"][1]["memory"]["available"]
-                self._data["openwrt_memory_cached"] = resdata["result"][1]["memory"]["cached"]
+                self._data["openwrt_memory_total"] = payload["memory"]["total"]
+                self._data["openwrt_memory_free"] = payload["memory"]["free"]
+                self._data["openwrt_memory_shared"] = payload["memory"]["shared"]
+                self._data["openwrt_memory_buffered"] = payload["memory"]["buffered"]
+                self._data["openwrt_memory_available"] = payload["memory"]["available"]
+                self._data["openwrt_memory_cached"] = payload["memory"]["cached"]
 
-                self._data["openwrt_memory_total_gb"] = round(resdata["result"][1]["memory"]["total"]/1024/1024/1024, 3)
-                self._data["openwrt_memory_free_gb"] = round(resdata["result"][1]["memory"]["free"]/1024/1024/1024, 3)
-                self._data["openwrt_memory_shared_gb"] = round(resdata["result"][1]["memory"]["shared"]/1024/1024/1024, 3)
-                self._data["openwrt_memory_buffered_gb"] = round(resdata["result"][1]["memory"]["buffered"]/1024/1024/1024, 3)
-                self._data["openwrt_memory_available_gb"] = round(resdata["result"][1]["memory"]["available"]/1024/1024/1024, 3)
-                self._data["openwrt_memory_cached_gb"] = round(resdata["result"][1]["memory"]["cached"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_total_gb"] = round(payload["memory"]["total"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_free_gb"] = round(payload["memory"]["free"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_shared_gb"] = round(payload["memory"]["shared"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_buffered_gb"] = round(payload["memory"]["buffered"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_available_gb"] = round(payload["memory"]["available"]/1024/1024/1024, 3)
+                self._data["openwrt_memory_cached_gb"] = round(payload["memory"]["cached"]/1024/1024/1024, 3)
                 # _LOGGER.debug("Id 1 - End")
 
             elif resdata["id"] == 2:
                 # _LOGGER.debug("Id 2 - Start")
-                cpuinfo = resdata["result"][1]["cpuinfo"]
+                cpuinfo = payload["cpuinfo"]
                 self._data["openwrt_cputemp"] = 0
                 # _LOGGER.debug("Id 2 - End")
 
             elif resdata["id"] == 3:
                 # _LOGGER.debug("Id 3 - Start")
-                self._data["openwrt_cpu"] = resdata["result"][1]["cpuusage"].replace("%", "")
+                self._data["openwrt_cpu"] = payload["cpuusage"].replace("%", "")
                 # _LOGGER.debug("Id 3 - End")
 
             elif resdata["id"] == 5:
                 # _LOGGER.debug("Id 5 - Start")
-                self._data["openwrt_conncount"] = resdata["result"][1]["data"].replace("\n", "")
+                self._data["openwrt_conncount"] = payload["data"].replace("\n", "")
                 # _LOGGER.debug("Id 5 - End")
 
             elif resdata["id"] == 6:
                 # _LOGGER.debug("Id 6- Start")
-                self._data["openwrt_user_online"] = resdata["result"][1]["onlineusers"]
+                self._data["openwrt_user_online"] = payload["onlineusers"]
                 # _LOGGER.debug("Id 6 - End")
 
             elif resdata["id"] == 7:
                 # _LOGGER.debug("Id 7 - Start")
-                if resdata["result"][1].get("wan"):
-                    self._data["openwrt_wan_ip"] = resdata["result"][1]["wan"]["ipaddr"]
-                    self._data["openwrt_wan_ip_attrs"] = resdata["result"][1]["wan"]
+                if payload.get("wan"):
+                    self._data["openwrt_wan_ip"] = payload["wan"]["ipaddr"]
+                    self._data["openwrt_wan_ip_attrs"] = payload["wan"]
                     try:
-                        self._data["openwrt_wan_uptime"] = self.seconds_to_dhms(resdata["result"][1]["wan"]["uptime"])
+                        self._data["openwrt_wan_uptime"] = self.seconds_to_dhms(payload["wan"]["uptime"])
                     except Exception:
-                        self._data["openwrt_wan_uptime"] = resdata["result"][1]["wan"]["uptime"]
+                        self._data["openwrt_wan_uptime"] = payload["wan"]["uptime"]
                 else:
                     self._data["openwrt_wan_ip"] = ""
                     self._data["openwrt_wan_uptime"] = ""
 
-                if resdata["result"][1].get("wan6"):
-                    self._data["openwrt_wan6_ip"] = resdata["result"][1]["wan6"]["ipaddr"]
-                    self._data["openwrt_wan6_ip_attrs"] = resdata["result"][1]["wan6"]
+                if payload.get("wan6"):
+                    self._data["openwrt_wan6_ip"] = payload["wan6"]["ipaddr"]
+                    self._data["openwrt_wan6_ip_attrs"] = payload["wan6"]
                     try:
-                        self._data["openwrt_wan6_uptime"] = self.seconds_to_dhms(resdata["result"][1]["wan6"]["uptime"])
+                        self._data["openwrt_wan6_uptime"] = self.seconds_to_dhms(payload["wan6"]["uptime"])
                     except Exception:
-                        self._data["openwrt_wan6_uptime"] = resdata["result"][1]["wan6"]["uptime"]
+                        self._data["openwrt_wan6_uptime"] = payload["wan6"]["uptime"]
 
                 else:
                     self._data["openwrt_wan6_ip"] = ""
@@ -464,23 +486,24 @@ class DataFetcher:
             elif resdata["id"] == 8:
                 # _LOGGER.debug("Id 8 - Start")
                 if self._data["openwrt_wan_ip"] == "":
-                    for ress in resdata["result"][1]["interface"]:
-                        if ress["interface"] == "lan":
+                    for ress in payload["interface"]:
+                        if ress["interface"] == "lan" and ress.get("ipv4-address"):
                             self._data["openwrt_wan_ip"] = ress["ipv4-address"][0]["address"]
                             self._data["openwrt_wan_uptime"] = self.seconds_to_dhms(ress["uptime"])
                 # _LOGGER.debug("Id 8 - End")
 
             elif resdata["id"] == 9:
                 # _LOGGER.debug("Id 9 - Start")
-                self._data["openwrt_rx"] = self.hum_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["rx_bytes"])
-                self._data["openwrt_tx"] = self.hum_convert_nounit(resdata["result"][1]["br-lan"]["stats"]["tx_bytes"])
+                self._data["openwrt_rx"] = self.hum_convert_nounit(payload["br-lan"]["stats"]["rx_bytes"])
+                self._data["openwrt_tx"] = self.hum_convert_nounit(payload["br-lan"]["stats"]["tx_bytes"])
                 # _LOGGER.debug("Id 9 - End")
 
             elif resdata["id"] == 10:
                 # _LOGGER.debug("Id 10 - Start")
-                jsonTmp = resdata["result"][1]["result"]
-                self._data["openwrt_rx_packets"] = self.speed_convert_nounit((jsonTmp[1][1] - jsonTmp[0][1])/(jsonTmp[1][0] - jsonTmp[0][0]))
-                self._data["openwrt_tx_packets"] = self.speed_convert_nounit((jsonTmp[1][3] - jsonTmp[0][1])/(jsonTmp[1][3] - jsonTmp[0][0]))
+                jsonTmp = payload["result"]
+                if isinstance(jsonTmp, list) and len(jsonTmp) >= 2 and jsonTmp[1][0] != jsonTmp[0][0]:
+                    self._data["openwrt_rx_packets"] = self.speed_convert_nounit((jsonTmp[1][1] - jsonTmp[0][1])/(jsonTmp[1][0] - jsonTmp[0][0]))
+                    self._data["openwrt_tx_packets"] = self.speed_convert_nounit((jsonTmp[1][3] - jsonTmp[0][1])/(jsonTmp[1][3] - jsonTmp[0][0]))
                 # _LOGGER.debug("Id 10 - End")
 
         querytime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -549,6 +572,9 @@ class DataFetcher:
                     asyncio.create_task(self._get_openwrt_passwall(sysauth)),
                 ]
                 await asyncio.gather(*tasks)
+
+                if self._data == 401:
+                    return 401
 
                 self._data["switch"] = []
                 tasks = []
